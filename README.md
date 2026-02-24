@@ -247,7 +247,7 @@ import type {
 
 ```typescript
 import { writeFile } from "node:fs/promises";
-import { arrayBufferToNodeBuffer } from "../types/nuvem-fiscal-api.httpclient";
+import { arrayBufferToNodeBuffer } from "../types/acbr-api.httpclient";
 
 // Node: para salvar o arquivo
 

@@ -1,0 +1,79 @@
+{
+  "name": "@alijunior/acbr-api-sdk-node",
+  "version": "2.3.4",
+  "description": "SDK em Typescript para comunicação com a api Acbr Api",
+  "keywords": [
+    "acbr",
+    "api",
+    "acbrapi",
+    "acbr-api",
+    "acbr api",
+    "sdk",
+    "node",
+    "typescript",
+    "nfe",
+    "nfce"
+  ],
+  "homepage": "https://github.com/alijuniorbr/acbr-api-sdk-node#readme",
+  "bugs": {
+    "url": "https://github.com/alijuniorbr/acbr-api-sdk-node/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alijuniorbr/acbr-api-sdk-node.git"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Junior Ali",
+    "email": "alijunior@gmail.com",
+    "url": "https://github.com/alijuniorbr"
+  },
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "LICENSE",
+    "README.md",
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup index.ts --format esm,cjs --dts --out-dir dist --clean",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm build",
+    "test": "dotenv -e .env -- tsx ./run/acbr-api-run-example.ts",
+    "tree": "tree -a -I 'node_modules|.git|dist|build|coverage|.turbo|.next|.cache' > content-tree.txt",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "bump": "pnpm version patch --no-git-tag-version",
+    "headers": "tsx scripts/add-file-headers.ts",
+    "prepare": "cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit"
+  },
+  "dependencies": {
+    "axios": "^1.13.2"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^7.5.0",
+    "@types/node": "^24.10.1",
+    "dotenv-cli": "^11.0.0",
+    "eslint": "^10.0.2",
+    "eslint-plugin-format": "^2.0.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

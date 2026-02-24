@@ -1,0 +1,5 @@
+#!/bin/sh
+pnpm headers
+pnpm bump
+pnpm build || exit 1
+git add -A
