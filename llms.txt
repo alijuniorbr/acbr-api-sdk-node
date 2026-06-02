@@ -1,0 +1,218 @@
+# @alijunior/acbr-api-sdk-node
+
+> SDK TypeScript/Node.js para a Acbr API (documentos fiscais brasileiros: NF-e, NFC-e, NFS-e, CT-e, MDF-e, etc.). Tipos gerados a partir do OpenAPI. Cliente HTTP plugável (fetch nativo ou axios). É gêmeo do @alijunior/nuvemfiscal-sdk-node: mesma interface, mesmos adapters e helpers, mudando apenas o nome do client (AcbrApi vs NuvemFiscalApi), o tokenUrl e o API_BASE.
+
+Este arquivo dá contexto a assistentes de IA sobre COMO usar o SDK corretamente em dois cenários: backend (Node) e browser. As assinaturas abaixo foram verificadas contra os tipos do pacote.
+
+## Conceitos centrais
+
+- `AcbrApi`: classe cliente (NÃO use `AcbrApiClient` — o nome correto é `AcbrApi`). Construtor: `new AcbrApi(httpClient, baseUrl)`. baseUrl de produção: `https://prod.acbr.api.br/`.
+- HTTP client: o `AcbrApi` não faz fetch direto; recebe um adapter que implementa a interface do SDK. Adapters prontos: `FetchHttpClient` (fetch nativo, Node >= 18) e `AxiosHttpClient` (axios).
+- Autenticação: OAuth2 Client Credentials via Keycloak. Endpoint de token: `https://auth.acbr.api.br/realms/ACBrAPI/protocol/openid-connect/token`. O token (Bearer) é obtido antes e injetado no HTTP client.
+- Tipagem: params, query, body e response de cada método são tipados a partir do OpenAPI. Ex.: `consultarEmpresa(...)` retorna `Empresa`; `criarEmpresa(...)` recebe `Empresa`.
+
+## Regra de ouro: onde o token é gerado
+
+- Client Credentials usa client_id + client_secret. O client_secret NUNCA vai para o browser em produção.
+- BACKEND: gere o token no servidor com `getAccessTokenString` ou `getClientCredentialsToken`. Use o client_secret apenas aqui.
+- BROWSER (produção): o front NÃO gera token. O backend gera e expõe um endpoint que devolve apenas o access_token (string). O front injeta esse token no HTTP client.
+- BROWSER (testes): existe `getAcbrApiTokenForBrowser`, mas veja a restrição de CORS abaixo.
+
+## CORS no Keycloak da Acbr API (importante)
+
+O servidor de autenticação Keycloak (`auth.acbr.api.br`) normalmente NÃO libera CORS para origens de browser. Consequência prática: obter o token DIRETO do navegador costuma ser bloqueado, mesmo em testes locais. Portanto:
+- Não dependa de `getAcbrApiTokenForBrowser` para apps reais.
+- O padrão correto é o backend obter o token (e idealmente atuar como proxy das chamadas da API), expondo ao front apenas o access_token ou os endpoints necessários.
+
+## Helpers de token (assinaturas verificadas)
+
+- `getClientCredentialsToken(input): Promise<ClientCredentialsToken>` — objeto completo `{ access_token, token_type?, expires_in?, scope?, ... }`.
+  - `input = { tokenUrl: string; clientId: string; clientSecret: string; scope?: string; authStyle?: "basic" | "body" | "both" | "auto" }`. `authStyle` padrão `"auto"`.
+- `getAccessTokenString(input): Promise<string>` — só a string access_token.
+- `getAcbrApiTokenForBrowser(clientId, clientSecret, tokenUrl?, scope?): Promise<string>` — SOMENTE testes; expõe o secret; sujeito a bloqueio CORS. `tokenUrl`/`scope` opcionais e posicionais. tokenUrl correto: `https://auth.acbr.api.br/realms/ACBrAPI/protocol/openid-connect/token`.
+
+## Adapters HTTP (assinaturas verificadas)
+
+- `new FetchHttpClient({ headers?: Record<string,string>; toQueryString?: (q) => string })`
+  - Token nos headers: `{ headers: { Authorization: ` + "`Bearer ${token}`" + ` } }`.
+- `new AxiosHttpClient(options)` onde `options = { accessToken?: string; axiosInstance?: AxiosInstance; baseURL?: string; headers?: Record<string,string>; timeoutMs?: number }`.
+  - IMPORTANTE: recebe um OBJETO, não a instância axios como arg posicional. `new AxiosHttpClient(axiosInstance)` está ERRADO.
+  - Instância própria: `new AxiosHttpClient({ axiosInstance })`. Adapter cria o axios: `new AxiosHttpClient({ accessToken, baseURL })`.
+  - Se `accessToken` e `axiosInstance` forem passados juntos, a `axiosInstance` prevalece.
+
+## Tratamento de erros (importante)
+
+- Os adapters lançam `Error` com `status` e (quando houver) `body`. Use `err.status` e `err.body`, NÃO `err.response.status` (formato do axios cru).
+- Em TypeScript strict, narrowing com `unknown`:
+  ```ts
+  catch (err: unknown) {
+    const status = (err as { status?: number }).status;
+    const body = (err as { body?: { error?: { message?: string } } }).body;
+  }
+  ```
+- Trate `404` como "não encontrado" (retorne null quando fizer sentido); propague os demais.
+- Exclusões (`excluirEmpresa`, `excluirCertificadoEmpresa`, etc.) retornam `void` (`204 No Content`).
+- EmpresaAlreadyExists: ao chamar `criarEmpresa` para um CNPJ já existente, a Acbr API pode retornar um erro com code `EmpresaAlreadyExists`. O status pode variar (não assuma 409). Detecção segura: `status === 409 || /AlreadyExists/i.test(code)` → faça fallback para `atualizarEmpresa`.
+
+## Cenário 1 — BACKEND (Node 18+, fetch nativo)
+
+Recomendado. O secret fica no servidor.
+
+```ts
+import {
+  AcbrApi,
+  FetchHttpClient,
+  getAccessTokenString,
+  type Empresa,
+} from "@alijunior/acbr-api-sdk-node";
+
+const accessToken = await getAccessTokenString({
+  tokenUrl: process.env.TOKEN_URL!, // https://auth.acbr.api.br/realms/ACBrAPI/protocol/openid-connect/token
+  clientId: process.env.CLIENT_ID!,
+  clientSecret: process.env.CLIENT_SECRET!,
+  scope: process.env.SCOPE,
+});
+
+const http = new FetchHttpClient({
+  headers: { Authorization: `Bearer ${accessToken}` },
+});
+const api = new AcbrApi(http, process.env.API_BASE!); // https://prod.acbr.api.br/
+
+// Empresa
+const empresa: Empresa = {
+  cpf_cnpj: "00000000000000",
+  nome_razao_social: "Minha Empresa LTDA",
+  email: "contato@empresa.com.br",
+  endereco: {
+    logradouro: "Rua Exemplo",
+    numero: "100",
+    bairro: "Centro",
+    codigo_municipio: "3550308",
+    uf: "SP",
+    cep: "01001000",
+  },
+};
+await api.criarEmpresa(empresa); // trate EmpresaAlreadyExists → atualizarEmpresa
+const cadastrada = await api.consultarEmpresa({ cpf_cnpj: empresa.cpf_cnpj });
+
+// Certificado (.pfx/.p12 em base64)
+await api.cadastrarCertificadoEmpresa(
+  { cpf_cnpj: empresa.cpf_cnpj },
+  { certificado: "BASE64_DO_PFX", password: "senha" }
+);
+
+// Config NFC-e (CRT + CSC). CRT: 1=SN, 2=SN excesso, 3=Normal, 4=MEI.
+await api.alterarConfigNfce(
+  { cpf_cnpj: empresa.cpf_cnpj },
+  { CRT: 1, ambiente: "homologacao", sefaz: { id_csc: 1, csc: "CODIGO_CSC" } }
+);
+```
+
+Token expira (`expires_in`). Em serviços longos, cacheie e renove antes de expirar (use `getClientCredentialsToken` para ler `expires_in`).
+
+## Cenário 1b — BACKEND com axios
+
+```ts
+import { AcbrApi, AxiosHttpClient, getAccessTokenString } from "@alijunior/acbr-api-sdk-node";
+
+const accessToken = await getAccessTokenString({
+  tokenUrl: process.env.TOKEN_URL!,
+  clientId: process.env.CLIENT_ID!,
+  clientSecret: process.env.CLIENT_SECRET!,
+});
+
+const http = new AxiosHttpClient({ accessToken, baseURL: process.env.API_BASE! });
+const api = new AcbrApi(http, process.env.API_BASE!);
+```
+
+## Cenário 2 — BROWSER em PRODUÇÃO (token vindo do backend)
+
+Por causa do CORS do Keycloak e da exposição do secret, o front nunca obtém o token. O backend executa Client Credentials e devolve só o access_token (ou atua como proxy das chamadas).
+
+Backend (rota que emite o token):
+```ts
+app.get("/api/ac-token", async (_req, res) => {
+  const accessToken = await getAccessTokenString({
+    tokenUrl: process.env.TOKEN_URL!,
+    clientId: process.env.CLIENT_ID!,
+    clientSecret: process.env.CLIENT_SECRET!, // só no servidor
+    scope: process.env.SCOPE,
+  });
+  res.json({ access_token: accessToken });
+});
+```
+
+Frontend:
+```ts
+import { AcbrApi, FetchHttpClient } from "@alijunior/acbr-api-sdk-node";
+
+const { access_token } = await (await fetch("/api/ac-token")).json();
+const http = new FetchHttpClient({ headers: { Authorization: `Bearer ${access_token}` } });
+const api = new AcbrApi(http, "https://prod.acbr.api.br/");
+```
+
+Mesmo com o token em mãos, chamar `prod.acbr.api.br` direto do browser pode esbarrar em CORS dependendo do endpoint. O mais robusto é o backend fazer proxy de todas as chamadas e o front conversar apenas com o seu backend.
+
+## Cenário 2b — BROWSER apenas para TESTES locais
+
+Expõe o secret e está sujeito a bloqueio CORS no Keycloak. Use só para validar o fluxo, ciente das limitações.
+
+```ts
+import { AcbrApi, AxiosHttpClient, getAcbrApiTokenForBrowser } from "@alijunior/acbr-api-sdk-node";
+
+const token = await getAcbrApiTokenForBrowser(
+  import.meta.env.VITE_ACBR_API_CLIENT_ID,
+  import.meta.env.VITE_ACBR_API_CLIENT_SECRET,
+  "https://auth.acbr.api.br/realms/ACBrAPI/protocol/openid-connect/token",
+  import.meta.env.VITE_ACBR_API_SCOPE
+);
+
+const http = new AxiosHttpClient({ accessToken: token, baseURL: "https://prod.acbr.api.br/" });
+const api = new AcbrApi(http, "https://prod.acbr.api.br/");
+```
+
+ARMADILHA COMUM: em apps Vite, NÃO coloque `import.meta.env.X` entre aspas. `"import.meta.env.VITE_X"` vira string literal e quebra a autenticação. Use sem aspas.
+
+## Download de binários (PDF/XML)
+
+Métodos como `baixarPdfNfe`, `baixarXmlNfe` retornam `ArrayBuffer`.
+
+```ts
+// Node
+import { writeFile } from "node:fs/promises";
+const pdf = await api.baixarPdfNfe({ id: "..." });
+await writeFile("nota.pdf", Buffer.from(pdf));
+
+// Browser
+const ab = await api.baixarPdfNfe({ id: "..." });
+const url = URL.createObjectURL(new Blob([ab], { type: "application/pdf" }));
+const a = document.createElement("a");
+a.href = url; a.download = "nota.pdf"; a.click();
+URL.revokeObjectURL(url);
+```
+
+## Métodos mais usados (nomes reais; params em objeto, sem máscara em CNPJ/CEP)
+
+- Empresa: `listarEmpresas(query?)` (aceita `cpf_cnpj` ou `$top`), `criarEmpresa(body)`, `consultarEmpresa({ cpf_cnpj })`, `atualizarEmpresa({ cpf_cnpj }, body)`, `excluirEmpresa({ cpf_cnpj })` (void).
+- Certificado: `consultarCertificadoEmpresa({ cpf_cnpj })`, `cadastrarCertificadoEmpresa({ cpf_cnpj }, { certificado, password })` (certificado em base64), `excluirCertificadoEmpresa({ cpf_cnpj })` (void).
+- Config NFC-e: `consultarConfigNfce({ cpf_cnpj })`, `alterarConfigNfce({ cpf_cnpj }, { CRT, ambiente, sefaz: { id_csc, csc } })`. Idem `Nfe` e demais documentos.
+- NFC-e/NF-e: `emitirNfce(body)` / `emitirNfe(body)`, `consultarNfce({ id })`, `cancelarNfce({ id }, body)`, `baixarPdfNfce({ id })`, `baixarXmlNfce({ id })`.
+- Consultas: `consultarCep({ Cep })`, `consultarCnpj({ Cnpj })`, `listarCnpj(query)`.
+
+Notas:
+- CNPJ/CPF e CEP sempre SEM máscara.
+- `codigo_municipio` usa código IBGE.
+- Tipo `Empresa`: `{ cpf_cnpj, inscricao_estadual?, inscricao_municipal?, nome_razao_social, nome_fantasia?, fone?, email, endereco }`. Campos `created_at`/`updated_at` são ignorados pela API no envio.
+- CRT (regime tributário): 1=Simples Nacional, 2=SN excesso de sublimite, 3=Regime Normal, 4=MEI.
+- Métodos com `{ id }` usam o ID gerado pela API na emissão, não a chave de acesso.
+
+## Erros a evitar (resumo para o LLM)
+
+1. A classe é `AcbrApi`, não `AcbrApiClient`.
+2. Não passe client_secret para o browser; e o Keycloak normalmente bloqueia CORS — gere token no backend.
+3. `AxiosHttpClient` recebe objeto `{ accessToken, baseURL }` ou `{ axiosInstance }`, nunca a instância como arg posicional.
+4. Erros expõem `err.status` e `err.body`, não `err.response.status`.
+5. `EmpresaAlreadyExists` pode vir com status != 409; detecte por `/AlreadyExists/i.test(code) || status === 409` e use `atualizarEmpresa`.
+6. Em Vite, `import.meta.env.X` sem aspas.
+7. Exclusões retornam `void` (204).
+8. Use `unknown` + narrowing no catch; evite `any` em código strict.
