@@ -1,6 +1,6 @@
 {
   "name": "@alijunior/acbr-api-sdk-node",
-  "version": "2.3.5",
+  "version": "2.3.6",
   "description": "SDK em Typescript para comunicação com a api Acbr Api",
   "keywords": [
     "acbr",

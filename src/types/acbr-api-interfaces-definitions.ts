@@ -72,6 +72,10 @@ export type EmpresaListagem = {
   "@count"?: number;
   "data"?: Empresa[];
 };
+export type EmpresaCertificadoListagem = {
+  "@count"?: number;
+  "data"?: EmpresaCertificado[];
+};
 export type EmpresaPedidoCadastroCertificado = {
   /**
    * Format: byte
@@ -82,6 +86,9 @@ export type EmpresaPedidoCadastroCertificado = {
   password: string;
 };
 export type EmpresaCertificado = {
+  id?: string;
+  /** Format: date-time */
+  created_at?: string;
   serial_number?: string;
   issuer_name?: string;
   /** Format: date-time */
@@ -413,10 +420,20 @@ export type CteOsSefazInfCteOS = {
   toma?: CteOsSefazTomaOS;
   vPrest: CteOsSefazVPrestOS;
   imp: CteOsSefazInfCte_ImpOS;
+  pgtoVinc?: CteOsSefazPgtoVincOS;
   infCTeNorm?: CteOsSefazInfCTeNormOS;
   infCteComp?: CteOsSefazInfCteCompOS[];
   autXML?: CteOsSefazAutXMLOS[];
   infRespTec?: CteOsSefazRespTecOS;
+  /**
+   * @description Tipo Pagamento ou Pagamento Antecipado.
+   * Informar:
+   * 1 - Pagamento Antecipado
+   * 3 - Fornecimento com pagamento realizado anteriormente
+   * Este campo é opcional e apenas deve ser informado quando pagamento que ocorre antes da prestação do serviço e na DFe de fornecimento associada a esses pagamentos, demais hipóteses de prestação de serviço sem antecipação não devem preencher.
+   */
+  tpPagAnt?: number;
+  gPagAntecipado?: CteOsSefazGPagAntecipadoOS;
 };
 /** @description Identificação do CT-e Outros Serviços. */
 export type CteOsSefazIdeOS = {
@@ -602,6 +619,21 @@ export type CteOsSefazCompraGovReduzidoOS = {
   tpEnteGov: number;
   /** @description Percentual de redução de aliquota em compra goverrnamental. */
   pRedutor: number;
+  /**
+   * @description Tipo da operação com ente governamental:
+   * 1 - Fornecimento com pagamento posterior
+   * 2 - Recebimento do pagamento com fornecimento já realizado
+   * 3 - Fornecimento com pagamento já realizado
+   * 4 - Recebimento do pagamento com fornecimento posterior
+   */
+  tpOperGov: number;
+  /**
+   * @description Chave de acesso do documento fiscal anterior.
+   * Deverá ser informado para tpOperGov 2 e 3 e vedado para os tipos 1 e 4.
+   * No caso do toOperGov 2 aceitará apenas uma chave referenciada, no tipo 3 poderá aceitar múltiplas chaves
+   * Obs: a chave de acesso deverá ser de um emitente com o mesmo CNPJ base.
+   */
+  refDFeAnt?: string[];
 };
 /** @description Dados complementares do CT-e para fins operacionais ou comerciais. */
 export type CteOsSefazComplOS = {
@@ -691,6 +723,11 @@ export type CteOsSefazEmitOS = {
    * Caso não seja informado, será utilizado o do cadastro da empresa.*
    */
   CRT?: number;
+  /**
+   * @description Inscrição do emitente da Suframa.
+   * Informar o número do Cadastro do emitente na Suframa. Campo obrigatório nas operações que se beneficiam de incentivos fiscais existentes nas áreas sob controle da SUFRAMA com alíquota zero da CBS referente aos arts. 451 e 466 da LC 214/25.
+   */
+  ISUFEmit?: string;
 };
 /**
  * @description Endereço do emitente.
@@ -1035,7 +1072,9 @@ export type CteOsSefazTribCTeOS = {
   /** @description Código Situação Tributária do IBS/CBS. */
   CST: string;
   cClassTrib?: string;
+  indDoacao?: number;
   gIBSCBS?: CteOsSefazCIBSOS;
+  gEstornoCred?: CteOsSefazEstornoCredOS;
 };
 export type CteOsSefazCIBSOS = {
   /** @description Valor do BC. */
@@ -1046,8 +1085,6 @@ export type CteOsSefazCIBSOS = {
   vIBS: number;
   gCBS: CteOsSefazGCBSOS;
   gTribRegular?: CteOsSefazTribRegularOS;
-  gIBSCredPres?: CteOsSefazCredPresOS;
-  gCBSCredPres?: CteOsSefazCredPresOS;
   gTribCompraGov?: CteOsSefazTribCompraGovOS;
 };
 /** @description Grupo de informações do IBS na UF. */
@@ -1069,6 +1106,8 @@ export type CteOsSefazDifOS = {
 };
 /** @description Grupo de Informações da devolução de tributos. */
 export type CteOsSefazDevTribOS = {
+  /** @description Percentual de devolução do tributo, conforme LC 214/25 art. 118. */
+  pDevTrib?: number;
   /**
    * @description Valor do tributo devolvido. No fornecimento de energia elétrica, água, esgoto e
    * gás natural e em outras hipóteses definidas no regulamento.
@@ -1099,8 +1138,25 @@ export type CteOsSefazGCBSOS = {
   gDif?: CteOsSefazDifOS;
   gDevTrib?: CteOsSefazDevTribOS;
   gRed?: CteOsSefazRedOS;
+  gALCZFMCBS?: CteOsSefazALCZFMCBSOS;
   /** @description Valor da CBS. */
   vCBS: number;
+};
+/**
+ * @description Grupo de operações em áreas incentivadas (ALC/ZFM) - CBS (alíquota zero).
+ * Grupo de informações para identificação de operações em áreas incentivadas (ALC/ZFM) com alíquota zero da CBS, conforme arts. 451 e 466 da LC 214/2025, quando fornecedor e destinatário estiverem nessas áreas, distinguindo a existência de processo aprovado na Suframa.
+ */
+export type CteOsSefazALCZFMCBSOS = {
+  /**
+   * @description Percentual efetivo sem a redução.
+   * Alíquota efetiva de referência da CBS aplicável à operação fora de áreas ou regimes incentivados.
+   */
+  pAliqEfetRegCBS: number;
+  /**
+   * @description Valor efetivo sem a redução.
+   * Valor da CBS calculado para a operação fora de áreas ou regimes incentivado.
+   */
+  vTribRegCBS: number;
 };
 /** @description Grupo de informações da Tributação Regular. Informar como seria a tributação caso não cumprida a condição resolutória/suspensiva. Exemplo 1: Art. 442, §4. Operações com ZFM e ALC. Exemplo 2: Operações com suspensão do tributo. */
 export type CteOsSefazTribRegularOS = {
@@ -1142,17 +1198,6 @@ export type CteOsSefazTribRegularOS = {
    */
   vTribRegCBS: number;
 };
-/** @description Grupo de Informações do Crédito Presumido referente ao IBS, quando aproveitado pelo emitente do documento. */
-export type CteOsSefazCredPresOS = {
-  /** @description Usar tabela Cred Presumido, para o emitente da nota. */
-  cCredPres: string;
-  /** @description Percentual do Crédito Presumido. */
-  pCredPres: number;
-  /** @description Valor do Crédito Presumido. */
-  vCredPres?: number;
-  /** @description Valor do Crédito Presumido Condição Suspensiva, preencher apenas para cCredPres que possui indicação de Condição Suspensiva. */
-  vCredPresCondSus?: number;
-};
 /** @description Grupo de informações da composição do valor do IBS e da CBS em compras governamental. */
 export type CteOsSefazTribCompraGovOS = {
   pAliqIBSUF?: number;
@@ -1164,6 +1209,36 @@ export type CteOsSefazTribCompraGovOS = {
   pAliqCBS?: number;
   /** @description Valor que seria devido a CBS, sem aplicação do Art. 473. da LC 214/2025. */
   vTribCBS: number;
+};
+/** @description Informado conforme indicador no cClassTrib. */
+export type CteOsSefazEstornoCredOS = {
+  /** @description Valor do IBS a ser estornado. */
+  vIBSEstCred: number;
+  /** @description Valor da CBS a ser estornada. */
+  vCBSEstCred: number;
+};
+/** @description Grupo de informações da vínculação com a transação de pagamento. */
+export type CteOsSefazPgtoVincOS = {
+  pgto: CteOsSefazPagamentoRTCOS[];
+};
+/** @description Dados de cada pagamento previsto. */
+export type CteOsSefazPagamentoRTCOS = {
+  /** @description Número sequencial do pagamento. */
+  nPag: string;
+  /** @description ID específico da transação financeira conforme o meio de pagamento. */
+  idTransacao: string;
+  /** @description (Meio de pagamento utilizado (ver IT DFe 2026.001). */
+  tpMeioPgto: string;
+  /**
+   * @description CNPJ do recebedor do pagamento.
+   * Informar zeros não significativos.
+   */
+  CNPJReceb: string;
+  /**
+   * @description CNPJ base da instituição financeira.
+   * Informar zeros não significativos.
+   */
+  CNPJBasePSP: string;
 };
 /** @description Grupo de informações do CT-e OS Normal. */
 export type CteOsSefazInfCTeNormOS = {
@@ -1437,6 +1512,18 @@ export type CteOsSefazRespTecOS = {
    * Se não informado, será calculado automaticamente, desde que os campos `idCSRT` e `CSRT` sejam fornecidos.*
    */
   hashCSRT?: string;
+};
+/**
+ * @description Grupo de antecipação de pagamento.
+ * Informado para abater as parcelas de antecipação de
+ * pagamento, conforme Art. 10. § 4º.
+ */
+export type CteOsSefazGPagAntecipadoOS = {
+  /**
+   * @description Chave de acesso do CTe de antecipação de pagamento.
+   * Referência a CTe emitido anteriormente, referente a pagamento antecipado.
+   */
+  chCTePagAnt: string;
 };
 /** @description Informações suplementares do CT-e. */
 export type CteOsSefazInfCTeSuplOS = {
@@ -2091,12 +2178,23 @@ export type InfDPS = {
    * Geramos automaticamente quando nenhum valor é informado.*
    */
   dCompet?: string;
+  /**
+   * @description Motivo da Emissão da DPS pelo Tomador/Intermediário:
+   * 1 - Importação de Serviço
+   * 2 - Tomador/Intermediário obrigado a emitir NFS-e por legislação municipal
+   * 3 - Tomador/Intermediário emitindo NFS-e por recusa de emissão pelo prestador
+   * 4 - Tomador/Intermediário emitindo por rejeitar a NFS-e emitida pelo prestador
+   */
+  cMotivoEmisTI?: number;
+  /** @description Chave de Acesso da NFS-e rejeitada pelo Tomador/Intermediário. */
+  chNFSeRej?: string;
   subst?: Substituicao;
   prest: InfoPrestador;
   toma?: InfoTomador;
   interm?: InfoIntermediario;
   serv: Serv;
   valores: InfoValores;
+  IBSCBS?: RTCInfoIBSCBS;
 };
 /** @description Dados da NFS-e a ser substituída. */
 export type Substituicao = {
@@ -2280,10 +2378,8 @@ export type Serv = {
   locPrest?: LocPrest;
   cServ: CServ;
   comExt?: ComExterior;
-  lsadppu?: LocacaoSublocacao;
   obra?: InfoObra;
   atvEvento?: AtvEvento;
-  explRod?: ExploracaoRodoviaria;
   infoCompl?: InfoCompl;
 };
 /** @description Grupo de informações relativas ao local da prestação do serviço. */
@@ -2419,17 +2515,6 @@ export type ComExterior = {
    */
   mdic: number;
 };
-/** @description Grupo de informações relativas a atividades de Locação, sublocação, arrendamento, direito de passagem ou permissão de uso, compartilhado ou não, de ferrovia, rodovia, postes, cabos, dutos e condutos de qualquer natureza. */
-export type LocacaoSublocacao = {
-  /** @description Categoria do serviço. */
-  categ: number;
-  /** @description Tipo de objetos da locação, sublocação, arrendamento, direito de passagem ou permissão de uso. */
-  objeto: number;
-  /** @description Extensão total da ferrovia, rodovia, cabos, dutos ou condutos. */
-  extensao: string;
-  /** @description Número total de postes. */
-  nPostes: string;
-};
 /** @description Grupo de informações do DPS relativas à serviço de obra. */
 export type InfoObra = {
   /**
@@ -2437,9 +2522,31 @@ export type InfoObra = {
    * Cadastro Nacional de Obras (CNO) ou Cadastro Específico do INSS (CEI).
    */
   cObra?: string;
+  /** @description Código do Cadastro Imobiliário Brasileiro - CIB. */
+  cCIB?: string;
   /** @description Inscrição imobiliária fiscal (código fornecido pela Prefeitura Municipal para a identificação da obra ou para fins de recolhimento do IPTU). */
   inscImobFisc?: string;
-  end?: EnderecoSimples;
+  end?: EnderObraEvento;
+};
+/** @description Grupo de informações do endereço da obra do serviço prestado. */
+export type EnderObraEvento = {
+  /** @description Número do CEP. */
+  CEP?: string;
+  endExt?: EnderExtSimples;
+  /** @description Tipo e nome do logradouro da localização do imóvel. */
+  xLgr: string;
+  /**
+   * @description Tipo do Logradouro.
+   *
+   * **Atenção**: Para emissões pelo Sistema Nacional NFS-e, esse campo é ignorado.
+   */
+  tpLgr?: string;
+  /** @description Número do imóvel. */
+  nro: string;
+  /** @description Complemento do endereço. */
+  xCpl?: string;
+  /** @description Bairro. */
+  xBairro: string;
 };
 /** @description Grupo de informações do endereço da obra do serviço prestado. */
 export type EnderecoSimples = {
@@ -2504,44 +2611,22 @@ export type AtvEvento = {
   id?: string;
   end?: EnderecoSimples;
 };
-/** @description Grupo de informações relativas a pedágio. */
-export type ExploracaoRodoviaria = {
-  /**
-   * @description Categorias de veículos para cobrança:
-   * 00 - Categoria de veículos (tipo não informado na nota de origem)
-   * 01 - Automóvel, caminhonete e furgão
-   * 02 - Caminhão leve, ônibus, caminhão trator e furgão
-   * 03 - Automóvel e caminhonete com semireboque
-   * 04 - Caminhão, caminhão-trator, caminhão-trator com semi-reboque e ônibus
-   * 05 - Automóvel e caminhonete com reboque
-   * 06 - Caminhão com reboque
-   * 07 - Caminhão trator com semi-reboque
-   * 08 - Motocicletas, motonetas e bicicletas motorizadas
-   * 09 - Veículo especial
-   * 10 - Veículo Isento
-   */
-  categVeic: string;
-  /** @description Número de eixos para fins de cobrança. */
-  nEixos: string;
-  /** @description Tipo de rodagem. */
-  rodagem: number;
-  /** @description Placa do veículo. */
-  sentido: string;
-  /** @description Placa do veículo. */
-  placa: string;
-  /** @description Código de acesso gerado automaticamente pelo sistema emissor da concessionária. */
-  codAcessoPed: string;
-  /** @description Código de contrato gerado automaticamente pelo sistema nacional no cadastro da concessionária. */
-  codContrato: string;
-};
 /** @description Grupo de informações complementares disponível para todos os serviços prestados. */
 export type InfoCompl = {
   /** @description Identificador de Documento de Responsabilidade Técnica: ART, RRT, DRT, Outros. */
   idDocTec?: string;
   /** @description Chave da nota, número identificador da nota, número do contrato ou outro identificador de documento emitido pelo prestador de serviços, que subsidia a emissão dessa nota pelo tomador do serviço ou intermediário (preenchimento obrigatório caso a nota esteja sendo emitida pelo Tomador ou intermediário do serviço). */
   docRef?: string;
+  /** @description Número do pedido/ordem de compra/ordem de serviço/projeto que autorize a prestação do serviço em operações B2B - Informação de interesse do tomador do serviço para controle e gestão da Negociação. */
+  xPed?: string;
+  gItemPed?: InfoItemPed;
   /** @description Informações complementares. */
   xInfComp?: string;
+};
+/** @description Grupo de itens do pedido/ordem de compra/ordem de serviço/projeto. */
+export type InfoItemPed = {
+  /** @description Número do item do pedido/ordem de compra/ordem de serviço/projeto - Identificação do número do item do pedido ou ordem de compra destacado e xPed. */
+  xItemPed: string[];
 };
 /** @description Grupo de informações relativas à valores do serviço prestado. */
 export type InfoValores = {
@@ -2765,7 +2850,7 @@ export type BeneficioMunicipal = {
    * 2 - Redução da BC
    * 3 - Isenção
    */
-  tpBM: number;
+  tpBM?: number;
   /** @description Identificador do benefício municipal parametrizado pelo município. */
   nBM: string;
   /** @description Valor monetário informado pelo emitente para redução da base de cálculo (BC) do ISSQN devido a um Benefício Municipal (BM). */
@@ -2857,6 +2942,216 @@ export type TribTotalPercent = {
   pTotTribEst: number;
   /** @description Valor percentual total aproximado dos tributos municipais (%%). */
   pTotTribMun: number;
+};
+/** @description Grupo de informações declaradas pelo emitente referentes ao IBS e à CBS. */
+export type RTCInfoIBSCBS = {
+  /**
+   * @description Indicador da finalidade da emissão de NFS-e:
+   * 0 - NFS-e regular.
+   */
+  finNFSe: number;
+  /**
+   * @description Indica operação de uso ou consumo pessoal (art. 57):
+   * 0 - Não;
+   * 1 - Sim.
+   */
+  indFinal: number;
+  /** @description Código indicador da operação de fornecimento, conforme tabela "código indicador de operação". */
+  cIndOp: string;
+  /**
+   * @description Tipo de Operação com Entes Governamentais ou outros serviços sobre bens imóveis:
+   * 1 - Fornecimento com pagamento posterior;
+   * 2 - Recebimento do pagamento com fornecimento já realizado;
+   * 3 - Fornecimento com pagamento já realizado;
+   * 4 - Recebimento do pagamento com fornecimento posterior;
+   * 5 - Fornecimento e recebimento do pagamento concomitantes.
+   */
+  tpOper?: number;
+  gRefNFSe?: InfoRefNFSe;
+  /**
+   * @description Tipo de ente governamental
+   * Para administração pública direta e suas autarquias e fundações:
+   * 1 - União;
+   * 2 - Estado;
+   * 3 - Distrito Federal;
+   * 4 - Município.
+   */
+  tpEnteGov?: number;
+  /**
+   * @description A respeito do Destinatário dos serviços:
+   * 0 - O destinatário - o próprio tomador/adquirente identificado na NFS-e (tomador = adquirente = destinatário);
+   * 1 - O destinatário não - o próprio adquirente, podendo ser outra pessoa, física ou jurídica (ou equiparada), ou um estabelecimento diferente do indicado como tomador (tomador = adquirente != destinatário).
+   */
+  indDest: number;
+  dest?: RTCInfoDest;
+  imovel?: RTCInfoImovel;
+  valores: RTCInfoValoresIBSCBS;
+};
+/** @description Grupo de NFS-e referenciadas. */
+export type InfoRefNFSe = {
+  /** @description Chave da NFS-e referenciada. */
+  refNFSe: string[];
+};
+/** @description Grupo de informações relativas ao Destinatário. */
+export type RTCInfoDest = {
+  /** @description Número da inscrição no Cadastro Nacional de Pessoa Jurídica (CNPJ) do Destinatário do serviço. */
+  CNPJ?: string;
+  /** @description Número da inscrição no Cadastro de Pessoa Física (CPF) do Destinatário do serviço. */
+  CPF?: string;
+  /** @description Número de Identificação Fiscal fornecido por órgão de administração tributária no exterior. */
+  NIF?: string;
+  /**
+   * @description Motivo para não informação do NIF:
+   * 0 - Não informado na nota de origem
+   * 1 - Dispensado do NIF
+   * 2 - Não exigência do NIF
+   */
+  cNaoNIF?: number;
+  /** @description Nome / Nome Empresarial do do Destinatário do serviço. */
+  xNome: string;
+  end?: Endereco;
+  /**
+   * @description Número do telefone do Destinatário do serviço
+   * (Preencher com o Código DDD + número do telefone. Nas operações com exterior é permitido informar o
+   * código do país + código da localidade + número do telefone).
+   */
+  fone?: string;
+  /** @description E-mail do Destinatário do serviço */
+  email?: string;
+};
+/** @description Grupo de informações de operações relacionadas a bens imóveis, exceto obras. */
+export type RTCInfoImovel = {
+  /** @description Inscrição imobiliária fiscal (código fornecido pela Prefeitura Municipal para a identificação da obra ou para fins de recolhimento do IPTU). */
+  inscImobFisc?: string;
+  /** @description Código do Cadastro Imobiliário Brasileiro - CIB. */
+  cCIB?: string;
+  end?: EnderObraEvento;
+};
+/** @description Grupo de informações relativas aos valores do serviço prestado para IBS e CBS. */
+export type RTCInfoValoresIBSCBS = {
+  gReeRepRes?: RTCInfoReeRepRes;
+  trib: RTCInfoTributosIBSCBS;
+};
+/**
+ * @description Grupo de informações relativas a valores incluídos neste documento e recebidos por motivo de estarem relacionadas
+ * a operações de terceiros, objeto de reembolso, repasse ou ressarcimento pelo recebedor, já tributados e aqui referenciados.
+ */
+export type RTCInfoReeRepRes = {
+  documentos: RTCListaDoc[];
+};
+/**
+ * @description Grupo relativo aos documentos referenciados nos casos de reembolso, repasse e ressarcimento que serão
+ * considerados na base de cálculo do ISSQN, do IBS e da CBS.
+ */
+export type RTCListaDoc = {
+  dFeNacional?: RTCListaDocDFe;
+  docFiscalOutro?: RTCListaDocFiscalOutro;
+  docOutro?: RTCListaDocOutro;
+  fornec?: RTCListaDocFornec;
+  /**
+   * Format: date
+   * @description Data da emissão do documento dedutível
+   * Ano, mês e dia (AAAA-MM-DD).
+   */
+  dtEmiDoc: string;
+  /**
+   * Format: date
+   * @description Data da competência do documento dedutível
+   * Ano, mês e dia (AAAA-MM-DD).
+   */
+  dtCompDoc: string;
+  /**
+   * @description Tipo de valor incluído neste documento, recebido por motivo de estarem relacionadas a operações de terceiros,
+   * objeto de reembolso, repasse ou ressarcimento pelo recebedor, já tributados e aqui referenciados.
+   */
+  tpReeRepRes: string;
+  /**
+   * @description Descrição do reembolso ou ressarcimento quando a opção é
+   * "99 - Outros reembolsos ou ressarcimentos recebidos por valores pagos relativos a operações por conta e ordem de terceiro".
+   */
+  xTpReeRepRes?: string;
+  /**
+   * @description Valor monetário (total ou parcial, conforme documento informado) utilizado para não inclusão na base de cálculo
+   * do ISS e do IBS e da CBS da NFS-e que está sendo emitida (R$).
+   */
+  vlrReeRepRes: number;
+};
+/** @description Grupo de informações de documentos fiscais eletrônicos que se encontram no repositório nacional. */
+export type RTCListaDocDFe = {
+  /** @description Documento fiscal a que se refere a chaveDfe que seja um dos documentos do Repositório Nacional. */
+  tipoChaveDFe: number;
+  /**
+   * @description Descrição da DF-e a que se refere a chaveDfe que seja um dos documentos do Repositório Nacional
+   * Deve ser preenchido apenas quando "tipoChaveDFe = 9 (Outro)".
+   */
+  xTipoChaveDFe?: string;
+  /** @description Chave do Documento Fiscal eletrônico do repositório nacional referenciado para os casos de operações já tributadas. */
+  chaveDFe: string;
+};
+/** @description Grupo de informações de documento fiscais, eletrônicos ou não, que não se encontram no repositório nacional. */
+export type RTCListaDocFiscalOutro = {
+  /** @description Código do município emissor do documento fiscal que não se encontra no repositório nacional. */
+  cMunDocFiscal: number;
+  /** @description Número do documento fiscal que não se encontra no repositório nacional. */
+  nDocFiscal: string;
+  /** @description Descrição do documento fiscal. */
+  xDocFiscal: string;
+};
+/** @description Grupo de informações de documento não fiscal. */
+export type RTCListaDocOutro = {
+  /** @description Número do documento não fiscal. */
+  nDoc: string;
+  /** @description Descrição do documento não fiscal. */
+  xDoc: string;
+};
+/** @description Grupo de informações do fornecedor do documento referenciado. */
+export type RTCListaDocFornec = {
+  /** @description Número da inscrição no Cadastro Nacional de Pessoa Jurídica (CNPJ) do Fornecedor do serviço. */
+  CNPJ?: string;
+  /** @description Número da inscrição no Cadastro de Pessoa Física (CPF) do Fornecedor do serviço. */
+  CPF?: string;
+  /** @description Este elemento só deverá ser preenchido para fornecedores não residentes no Brasil. */
+  NIF?: string;
+  /**
+   * @description Motivo para não informação do NIF:
+   * 0 - Não informado na nota de origem
+   * 1 - Dispensado do NIF
+   * 2 - Não exigência do NIF
+   */
+  cNaoNIF?: number;
+  /** @description Nome / Razão Social do do Fornecedor do serviço. */
+  xNome: string;
+};
+/** @description Grupo de informações relacionados aos tributos IBS e CBS. */
+export type RTCInfoTributosIBSCBS = {
+  gIBSCBS: RTCInfoTributosSitClas;
+};
+/** @description Grupo de informações relacionadas ao IBS e à CBS. */
+export type RTCInfoTributosSitClas = {
+  /** @description Código de Situação Tributária do IBS e da CBS. */
+  CST: string;
+  /** @description Código de Classificação Tributária do IBS e da CBS. */
+  cClassTrib: string;
+  /** @description Código e Classificação do Crédito Presumido: IBS e CBS. */
+  cCredPres?: string;
+  gTribRegular?: RTCInfoTributosTribRegular;
+  gDif?: RTCInfoTributosDif;
+};
+/** @description Grupo de informações da Tributação Regular. */
+export type RTCInfoTributosTribRegular = {
+  /** @description Código de Situação Tributária do IBS e da CBS de tributação regular. */
+  CSTReg: string;
+  /** @description Código da Classificação Tributária do IBS e da CBS de tributação regular. */
+  cClassTribReg: string;
+};
+/** @description Grupo de informações relacionadas ao diferimento para IBS e CBS. */
+export type RTCInfoTributosDif = {
+  /** @description Percentual de diferimento para o IBS estadual. */
+  pDifUF: number;
+  /** @description Percentual de diferimento para o IBS municipal. */
+  pDifMun: number;
+  /** @description Percentual de diferimento para a CBS. */
+  pDifCBS: number;
 };
 export type RpsLoteListagem = {
   "@count"?: number;
@@ -3785,6 +4080,7 @@ export type NfcomSefazInfNFCom = {
   gSub?: NfcomSefazGSub;
   gCofat?: NfcomSefazGCofat;
   det: NfcomSefazDet[];
+  pgtoVinc?: NfcomSefazPgtoVinc;
   total: NfcomSefazTotal;
   gFidelidade?: NfcomSefazGFidelidade;
   gFat?: NfcomSefazGFat;
@@ -3900,6 +4196,16 @@ export type NfcomSefazIde = {
   /** @description Justificativa da entrada em contingência. */
   xJust?: string;
   gCompraGov?: NfcomSefazCompraGovReduzido;
+  /**
+   * @description Tipo Pagamento ou Pagamento Antecipado.
+   * Informar:
+   * 1 - Pagamento Antecipado de Serviços Não Continuados
+   * 2 - Pagamento de serviços continuados (antes da prestação)
+   * 3 - Fornecimento com pagamento realizado anteriormente
+   * Este campo é opcional e apenas deve ser informado em notas de pagamento que ocorre antes da prestação do serviço e na nota de fornecimento associada a esses pagamentos, Notas Normais que retratam a prestação de serviço continuado mensal da nota fatura (contendo ou não itens de serviço não continuado) em que o pagamento não foi antecipado NÃO DEVEM INFORMAR ESSE CAMPO.
+   * A tabela cClass terá uma flag que sinaliza se o tipo de item é de prestação continuada ou não continuada.
+   */
+  tpPagAnt?: number;
 };
 /** @description Grupo de Compras Governamentais. */
 export type NfcomSefazCompraGovReduzido = {
@@ -3913,6 +4219,21 @@ export type NfcomSefazCompraGovReduzido = {
   tpEnteGov: number;
   /** @description Percentual de redução de aliquota em compra goverrnamental. */
   pRedutor: number;
+  /**
+   * @description Tipo da operação com ente governamental:
+   * 1 - Fornecimento com pagamento posterior
+   * 2 - Recebimento do pagamento com fornecimento já realizado
+   * 3 - Fornecimento com pagamento já realizado
+   * 4 - Recebimento do pagamento com fornecimento posterior
+   */
+  tpOperGov: number;
+  /**
+   * @description Chave de acesso do documento fiscal anterior.
+   * Deverá ser informado para tpOperGov 2 e 3 e vedado para os tipos 1 e 4.
+   * No caso do toOperGov 2 aceitará apenas uma chave referenciada, no tipo 3 poderá aceitar múltiplas chaves
+   * Obs: a chave de acesso deverá ser de um emitente com o mesmo CNPJ base.
+   */
+  refDFeAnt?: string[];
 };
 /** @description Identificação do Emitente do documento fiscal. */
 export type NfcomSefazEmit = {
@@ -3951,6 +4272,11 @@ export type NfcomSefazEmit = {
    */
   xFant?: string;
   enderEmit?: NfcomSefazEndeEmi;
+  /**
+   * @description Inscrição do emitente da Suframa.
+   * Informar o número do Cadastro do emitente na Suframa. Campo obrigatório nas operações que se beneficiam de incentivos fiscais existentes nas áreas sob controle da SUFRAMA com alíquota zero da CBS referente aos arts. 451 e 466 da LC 214/25.
+   */
+  ISUFEmit?: string;
 };
 /**
  * @description Endereço do emitente.
@@ -4291,6 +4617,27 @@ export type NfcomSefazProd = {
    * 1 - Devolução do valor do item
    */
   indDevolucao?: number;
+  /**
+   * @description CNPJ de cobrança de terceiro.
+   * Informar quando cClass do grupo 110 - Cobrança de terceiros.
+   */
+  CNPJCobrTerc?: string;
+  gPagAntecipado?: NfcomSefazGPagAntecipado;
+};
+/**
+ * @description Grupo de antecipação de pagamento
+ * Permite informar apenas quando tpPagAnt=3.
+ * Informado para abater as parcelas de antecipação de
+ * pagamento.
+ */
+export type NfcomSefazGPagAntecipado = {
+  /**
+   * @description Chave de acesso da nota de antecipação de pagamento (com tpPagAnt=1 ou 2).
+   * Referência a DFe emitido anteriormente, referente a pagamento antecipado.
+   */
+  chDFePagAnt: string;
+  /** @description Número do item do DFe de antecipação para referência direta a um item. */
+  nItemPagAnt?: string;
 };
 /** @description Tributos incidentes no Produto ou Serviço. */
 export type NfcomSefazImposto = {
@@ -4540,7 +4887,10 @@ export type NfcomSefazTribNFCom = {
   /** @description Código Situação Tributária do IBS/CBS. */
   CST: string;
   cClassTrib?: string;
+  /** @description Indica se a operação é de doação. */
+  indDoacao?: number;
   gIBSCBS?: NfcomSefazCIBS;
+  gEstornoCred?: NfcomSefazEstornoCred;
 };
 export type NfcomSefazCIBS = {
   /** @description Valor do BC. */
@@ -4551,8 +4901,6 @@ export type NfcomSefazCIBS = {
   vIBS: number;
   gCBS: NfcomSefazGCBS;
   gTribRegular?: NfcomSefazTribRegular;
-  gIBSCredPres?: NfcomSefazCredPres;
-  gCBSCredPres?: NfcomSefazCredPres;
   gTribCompraGov?: NfcomSefazTribCompraGov;
 };
 /** @description Grupo de informações do IBS na UF. */
@@ -4574,6 +4922,8 @@ export type NfcomSefazDif = {
 };
 /** @description Grupo de Informações da devolução de tributos. */
 export type NfcomSefazDevTrib = {
+  /** @description Percentual de devolução do tributo, conforme LC 214/25 art. 118. */
+  pDevTrib?: number;
   /**
    * @description Valor do tributo devolvido. No fornecimento de energia elétrica, água, esgoto e
    * gás natural e em outras hipóteses definidas no regulamento.
@@ -4604,8 +4954,25 @@ export type NfcomSefazGCBS = {
   gDif?: NfcomSefazDif;
   gDevTrib?: NfcomSefazDevTrib;
   gRed?: NfcomSefazRed;
+  gALCZFMCBS?: NfcomSefazALCZFMCBS;
   /** @description Valor da CBS. */
   vCBS: number;
+};
+/**
+ * @description Grupo de operações em áreas incentivadas (ALC/ZFM) - CBS (alíquota zero).
+ * Grupo de informações para identificação de operações em áreas incentivadas (ALC/ZFM) com alíquota zero da CBS, conforme arts. 451 e 466 da LC 214/2025, quando fornecedor e destinatário estiverem nessas áreas, distinguindo a existência de processo aprovado na Suframa.
+ */
+export type NfcomSefazALCZFMCBS = {
+  /**
+   * @description Percentual efetivo sem a redução.
+   * Alíquota efetiva de referência da CBS aplicável à operação fora de áreas ou regimes incentivados.
+   */
+  pAliqEfetRegCBS: number;
+  /**
+   * @description Valor efetivo sem a redução.
+   * Valor da CBS calculado para a operação fora de áreas ou regimes incentivado.
+   */
+  vTribRegCBS: number;
 };
 /** @description Grupo de informações da Tributação Regular. Informar como seria a tributação caso não cumprida a condição resolutória/suspensiva. Exemplo 1: Art. 442, §4. Operações com ZFM e ALC. Exemplo 2: Operações com suspensão do tributo. */
 export type NfcomSefazTribRegular = {
@@ -4647,17 +5014,6 @@ export type NfcomSefazTribRegular = {
    */
   vTribRegCBS: number;
 };
-/** @description Grupo de Informações do Crédito Presumido referente ao IBS, quando aproveitado pelo emitente do documento. */
-export type NfcomSefazCredPres = {
-  /** @description Usar tabela Cred Presumido, para o emitente da nota. */
-  cCredPres: string;
-  /** @description Percentual do Crédito Presumido. */
-  pCredPres: number;
-  /** @description Valor do Crédito Presumido. */
-  vCredPres?: number;
-  /** @description Valor do Crédito Presumido Condição Suspensiva, preencher apenas para cCredPres que possui indicação de Condição Suspensiva. */
-  vCredPresCondSus?: number;
-};
 /** @description Grupo de informações da composição do valor do IBS e da CBS em compras governamental. */
 export type NfcomSefazTribCompraGov = {
   pAliqIBSUF?: number;
@@ -4669,6 +5025,13 @@ export type NfcomSefazTribCompraGov = {
   pAliqCBS?: number;
   /** @description Valor que seria devido a CBS, sem aplicação do Art. 473. da LC 214/2025. */
   vTribCBS: number;
+};
+/** @description Informado conforme indicador no cClassTrib. */
+export type NfcomSefazEstornoCred = {
+  /** @description Valor do IBS a ser estornado. */
+  vIBSEstCred: number;
+  /** @description Valor da CBS a ser estornada. */
+  vCBSEstCred: number;
 };
 /**
  * @description Grupo Processo referenciado.
@@ -4744,6 +5107,29 @@ export type NfcomSefazGRessarc = {
   /** @description Observações sobre o processo de ressarcimento. */
   xObs?: string;
 };
+/** @description Grupo de informações da vínculação com a transação de pagamento. */
+export type NfcomSefazPgtoVinc = {
+  pgto: NfcomSefazPagamentoRTC[];
+};
+/** @description Dados de cada pagamento previsto. */
+export type NfcomSefazPagamentoRTC = {
+  /** @description Número sequencial do pagamento. */
+  nPag: string;
+  /** @description ID específico da transação financeira conforme o meio de pagamento. */
+  idTransacao: string;
+  /** @description (Meio de pagamento utilizado (ver IT DFe 2026.001). */
+  tpMeioPgto: string;
+  /**
+   * @description CNPJ do recebedor do pagamento.
+   * Informar zeros não significativos.
+   */
+  CNPJReceb: string;
+  /**
+   * @description CNPJ base da instituição financeira.
+   * Informar zeros não significativos.
+   */
+  CNPJBasePSP: string;
+};
 /** @description Dados dos totais da NFCom. */
 export type NfcomSefazTotal = {
   /** @description Valor Total dos produtos e serviços. */
@@ -4799,6 +5185,7 @@ export type NfcomSefazIBSCBSTot = {
   vBCIBSCBS: number;
   gIBS: NfcomSefazGIBS;
   gCBS: NfcomSefazIBSCBSTot_GCBS;
+  gEstornoCred?: NfcomSefazGEstornoCred;
 };
 /** @description Totalização do IBS. */
 export type NfcomSefazGIBS = {
@@ -4806,10 +5193,6 @@ export type NfcomSefazGIBS = {
   gIBSMun: NfcomSefazGIBS_GIBSMun;
   /** @description Valor total do IBS. */
   vIBS: number;
-  /** @description Total do Crédito Presumido. */
-  vCredPres: number;
-  /** @description Total do Crédito Presumido Condição Suspensiva. */
-  vCredPresCondSus: number;
 };
 /** @description Totalização do IBS de competência da UF. */
 export type NfcomSefazGIBS_GIBSUF = {
@@ -4837,10 +5220,13 @@ export type NfcomSefazIBSCBSTot_GCBS = {
   vDevTrib: number;
   /** @description Valor total da CBS. */
   vCBS: number;
-  /** @description Total do Crédito Presumido. */
-  vCredPres: number;
-  /** @description Total do Crédito Presumido Condição Suspensiva. */
-  vCredPresCondSus: number;
+};
+/** @description Totalização do estorno de crédito. */
+export type NfcomSefazGEstornoCred = {
+  /** @description Valor total do IBS estornado. */
+  vIBSEstCred: number;
+  /** @description Valor total da CBS estornada. */
+  vCBSEstCred: number;
 };
 /** @description Grupo de informações do programa de fidelidade do assinante. */
 export type NfcomSefazGFidelidade = {
@@ -4982,10 +5368,33 @@ export type ContaCota = {
   nome?: string;
   consumo?: number;
   limite?: number;
+  disponivel?: number;
+  ultima_atualizacao?: string;
 };
 export type ContaCotaListagem = {
   "@count"?: number;
   "data"?: ContaCota[];
+};
+export type ContaCotaPrePago = {
+  percentual_disponivel?: number;
+  creditos_disponiveis?: number;
+  ultima_atualizacao?: string;
+};
+export type ContaExtratoCreditoListagem = {
+  "@count"?: number;
+  "data"?: ContaExtratoCredito[];
+};
+export type ContaExtratoCredito = {
+  tenant_id?: string;
+  /** Format: date-time */
+  created_at?: string;
+  quota_name?: string;
+  movement_type?: string;
+  credits?: number;
+  document_id?: string;
+  arquivo_id?: string;
+  http_method?: string;
+  uri?: string;
 };
 export type CtePedidoEmissao = {
   infCte: CteSefazInfCte;
@@ -5021,6 +5430,7 @@ export type CteSefazInfCte = {
   dest?: CteSefazDest;
   vPrest: CteSefazVPrest;
   imp: CteSefazInfCte_Imp;
+  pgtoVinc?: CteSefazPgtoVinc;
   infCTeNorm?: CteSefazInfCTeNorm;
   infCteComp?: CteSefazInfCteComp[];
   autXML?: CteSefazAutXML[];
@@ -5210,6 +5620,15 @@ export type CteSefazIde = {
   /** @description Justificativa da entrada em contingência. */
   xJust?: string;
   gCompraGov?: CteSefazCompraGovReduzido;
+  /**
+   * @description Tipo Pagamento ou Pagamento Antecipado.
+   * Informar:
+   * 1 - Pagamento Antecipado
+   * 3 - Fornecimento com pagamento realizado anteriormente
+   * Este campo é opcional e apenas deve ser informado quando pagamento que ocorre antes da prestação do serviço e na DFe de fornecimento associada a esses pagamentos, demais hipóteses de prestação de serviço sem antecipação não devem preencher.
+   */
+  tpPagAnt?: number;
+  gPagAntecipado?: CteSefazGPagAntecipado;
 };
 /** @description Indicador do "papel" do tomador do serviço no CT-e. */
 export type CteSefazToma3 = {
@@ -5309,6 +5728,33 @@ export type CteSefazCompraGovReduzido = {
   tpEnteGov: number;
   /** @description Percentual de redução de aliquota em compra goverrnamental. */
   pRedutor: number;
+  /**
+   * @description Tipo da operação com ente governamental:
+   * 1 - Fornecimento com pagamento posterior
+   * 2 - Recebimento do pagamento com fornecimento já realizado
+   * 3 - Fornecimento com pagamento já realizado
+   * 4 - Recebimento do pagamento com fornecimento posterior
+   */
+  tpOperGov: number;
+  /**
+   * @description Chave de acesso do documento fiscal anterior.
+   * Deverá ser informado para tpOperGov 2 e 3 e vedado para os tipos 1 e 4.
+   * No caso do toOperGov 2 aceitará apenas uma chave referenciada, no tipo 3 poderá aceitar múltiplas chaves
+   * Obs: a chave de acesso deverá ser de um emitente com o mesmo CNPJ base.
+   */
+  refDFeAnt?: string[];
+};
+/**
+ * @description Grupo de antecipação de pagamento.
+ * Informado para abater as parcelas de antecipação de
+ * pagamento, conforme Art. 10. § 4º.
+ */
+export type CteSefazGPagAntecipado = {
+  /**
+   * @description Chave de acesso do CTe de antecipação de pagamento.
+   * Referência a CTe emitido anteriormente, referente a pagamento antecipado.
+   */
+  chCTePagAnt: string;
 };
 /** @description Dados complementares do CT-e para fins operacionais ou comerciais. */
 export type CteSefazCompl = {
@@ -5541,6 +5987,11 @@ export type CteSefazEmit = {
    * Caso não seja informado, será utilizado o do cadastro da empresa.*
    */
   CRT?: number;
+  /**
+   * @description Inscrição do emitente da Suframa.
+   * Informar o número do Cadastro do emitente na Suframa. Campo obrigatório nas operações que se beneficiam de incentivos fiscais existentes nas áreas sob controle da SUFRAMA com alíquota zero da CBS referente aos arts. 451 e 466 da LC 214/25.
+   */
+  ISUFEmit?: string;
 };
 /**
  * @description Endereço do emitente.
@@ -5952,7 +6403,9 @@ export type CteSefazTribCTe = {
   /** @description Código Situação Tributária do IBS/CBS. */
   CST: string;
   cClassTrib?: string;
+  indDoacao?: number;
   gIBSCBS?: CteSefazCIBS;
+  gEstornoCred?: CteSefazEstornoCred;
 };
 export type CteSefazCIBS = {
   /** @description Valor do BC. */
@@ -5963,8 +6416,6 @@ export type CteSefazCIBS = {
   vIBS: number;
   gCBS: CteSefazGCBS;
   gTribRegular?: CteSefazTribRegular;
-  gIBSCredPres?: CteSefazCredPres;
-  gCBSCredPres?: CteSefazCredPres;
   gTribCompraGov?: CteSefazTribCompraGov;
 };
 /** @description Grupo de informações do IBS na UF. */
@@ -5986,6 +6437,8 @@ export type CteSefazDif = {
 };
 /** @description Grupo de Informações da devolução de tributos. */
 export type CteSefazDevTrib = {
+  /** @description Percentual de devolução do tributo, conforme LC 214/25 art. 118. */
+  pDevTrib?: number;
   /**
    * @description Valor do tributo devolvido. No fornecimento de energia elétrica, água, esgoto e
    * gás natural e em outras hipóteses definidas no regulamento.
@@ -6016,8 +6469,25 @@ export type CteSefazGCBS = {
   gDif?: CteSefazDif;
   gDevTrib?: CteSefazDevTrib;
   gRed?: CteSefazRed;
+  gALCZFMCBS?: CteSefazALCZFMCBS;
   /** @description Valor da CBS. */
   vCBS: number;
+};
+/**
+ * @description Grupo de operações em áreas incentivadas (ALC/ZFM) - CBS (alíquota zero).
+ * Grupo de informações para identificação de operações em áreas incentivadas (ALC/ZFM) com alíquota zero da CBS, conforme arts. 451 e 466 da LC 214/2025, quando fornecedor e destinatário estiverem nessas áreas, distinguindo a existência de processo aprovado na Suframa.
+ */
+export type CteSefazALCZFMCBS = {
+  /**
+   * @description Percentual efetivo sem a redução.
+   * Alíquota efetiva de referência da CBS aplicável à operação fora de áreas ou regimes incentivados.
+   */
+  pAliqEfetRegCBS: number;
+  /**
+   * @description Valor efetivo sem a redução.
+   * Valor da CBS calculado para a operação fora de áreas ou regimes incentivado.
+   */
+  vTribRegCBS: number;
 };
 /** @description Grupo de informações da Tributação Regular. Informar como seria a tributação caso não cumprida a condição resolutória/suspensiva. Exemplo 1: Art. 442, §4. Operações com ZFM e ALC. Exemplo 2: Operações com suspensão do tributo. */
 export type CteSefazTribRegular = {
@@ -6059,17 +6529,6 @@ export type CteSefazTribRegular = {
    */
   vTribRegCBS: number;
 };
-/** @description Grupo de Informações do Crédito Presumido referente ao IBS, quando aproveitado pelo emitente do documento. */
-export type CteSefazCredPres = {
-  /** @description Usar tabela Cred Presumido, para o emitente da nota. */
-  cCredPres: string;
-  /** @description Percentual do Crédito Presumido. */
-  pCredPres: number;
-  /** @description Valor do Crédito Presumido. */
-  vCredPres?: number;
-  /** @description Valor do Crédito Presumido Condição Suspensiva, preencher apenas para cCredPres que possui indicação de Condição Suspensiva. */
-  vCredPresCondSus?: number;
-};
 /** @description Grupo de informações da composição do valor do IBS e da CBS em compras governamental. */
 export type CteSefazTribCompraGov = {
   pAliqIBSUF?: number;
@@ -6081,6 +6540,36 @@ export type CteSefazTribCompraGov = {
   pAliqCBS?: number;
   /** @description Valor que seria devido a CBS, sem aplicação do Art. 473. da LC 214/2025. */
   vTribCBS: number;
+};
+/** @description Informado conforme indicador no cClassTrib. */
+export type CteSefazEstornoCred = {
+  /** @description Valor do IBS a ser estornado. */
+  vIBSEstCred: number;
+  /** @description Valor da CBS a ser estornada. */
+  vCBSEstCred: number;
+};
+/** @description Grupo de informações da vínculação com a transação de pagamento. */
+export type CteSefazPgtoVinc = {
+  pgto: CteSefazPagamentoRTC[];
+};
+/** @description Dados de cada pagamento previsto. */
+export type CteSefazPagamentoRTC = {
+  /** @description Número sequencial do pagamento. */
+  nPag: string;
+  /** @description ID específico da transação financeira conforme o meio de pagamento. */
+  idTransacao: string;
+  /** @description (Meio de pagamento utilizado (ver IT DFe 2026.001). */
+  tpMeioPgto: string;
+  /**
+   * @description CNPJ do recebedor do pagamento.
+   * Informar zeros não significativos.
+   */
+  CNPJReceb: string;
+  /**
+   * @description CNPJ base da instituição financeira.
+   * Informar zeros não significativos.
+   */
+  CNPJBasePSP: string;
 };
 /** @description Grupo de informações do CT-e Normal e Substituto. */
 export type CteSefazInfCTeNorm = {
@@ -6967,6 +7456,7 @@ export type CteSimpSefazInfCteSimp = {
   cobr?: CteSimpSefazCobrSimp;
   infCteSub?: CteSimpSefazInfCteSubSimp;
   imp: CteSimpSefazInfCte_ImpSimp;
+  pgtoVinc?: CteSimpSefazPgtoVincSimp;
   total: CteSimpSefazTotalSimp;
   autXML?: CteSimpSefazAutXMLSimp[];
   infRespTec?: CteSimpSefazRespTecSimp;
@@ -7116,6 +7606,15 @@ export type CteSimpSefazIdeSimp = {
   /** @description Justificativa da entrada em contingência. */
   xJust?: string;
   gCompraGov?: CteSimpSefazCompraGovReduzidoSimp;
+  /**
+   * @description Tipo Pagamento ou Pagamento Antecipado.
+   * Informar:
+   * 1 - Pagamento Antecipado
+   * 3 - Fornecimento com pagamento realizado anteriormente
+   * Este campo é opcional e apenas deve ser informado em caso de Antecipação de Pagamento e no CTe de fornecimento associada a esses pagamentos antecipados, demais hipóteses de prestação de serviço sem antecipação não devem preencher.
+   */
+  tpPagAnt?: number;
+  gPagAntecipado?: CteSimpSefazGPagAntecipadoSimp;
 };
 /** @description Grupo de Compras Governamentais. */
 export type CteSimpSefazCompraGovReduzidoSimp = {
@@ -7129,6 +7628,34 @@ export type CteSimpSefazCompraGovReduzidoSimp = {
   tpEnteGov: number;
   /** @description Percentual de redução de aliquota em compra goverrnamental. */
   pRedutor: number;
+  /**
+   * @description Tipo da operação com ente governamental:
+   * 1 - Fornecimento com pagamento posterior
+   * 2 - Recebimento do pagamento com fornecimento já realizado
+   * 3 - Fornecimento com pagamento já realizado
+   * 4 - Recebimento do pagamento com fornecimento posterior
+   */
+  tpOperGov: number;
+  /**
+   * @description Chave de acesso do documento fiscal anterior.
+   * Deverá ser informado para tpOperGov 2 e 3 e vedado para os tipos 1 e 4.
+   * No caso do toOperGov 2 aceitará apenas uma chave referenciada, no tipo 3 poderá aceitar múltiplas chaves
+   * Obs: a chave de acesso deverá ser de um emitente com o mesmo CNPJ base.
+   */
+  refDFeAnt?: string[];
+};
+/**
+ * @description Grupo de antecipação de pagamento
+ * Permite informar apenas quando tpPagAnt=3.
+ * Informado para abater as parcelas de antecipação de
+ * pagamento, conforme Art. 10. § 4º.
+ */
+export type CteSimpSefazGPagAntecipadoSimp = {
+  /**
+   * @description Chave de acesso do DFe de antecipação de pagamento (com tpPagAnt=1).
+   * Referência a CTe emitido anteriormente, referente a pagamento antecipado.
+   */
+  chDFePagAnt: string;
 };
 /** @description Dados complementares do CT-e para fins operacionais ou comerciais. */
 export type CteSimpSefazComplSimp = {
@@ -7255,6 +7782,11 @@ export type CteSimpSefazEmitSimp = {
    * Caso não seja informado, será utilizado o do cadastro da empresa.*
    */
   CRT?: number;
+  /**
+   * @description Inscrição do emitente da Suframa.
+   * Informar o número do Cadastro do emitente na Suframa. Campo obrigatório nas operações que se beneficiam de incentivos fiscais existentes nas áreas sob controle da SUFRAMA com alíquota zero da CBS referente aos arts. 451 e 466 da LC 214/25.
+   */
+  ISUFEmit?: string;
 };
 /**
  * @description Endereço do emitente.
@@ -8246,7 +8778,9 @@ export type CteSimpSefazTribCTeSimp = {
   /** @description Código Situação Tributária do IBS/CBS. */
   CST: string;
   cClassTrib?: string;
+  indDoacao?: number;
   gIBSCBS?: CteSimpSefazCIBSSimp;
+  gEstornoCred?: CteSimpSefazEstornoCredSimp;
 };
 export type CteSimpSefazCIBSSimp = {
   /** @description Valor do BC. */
@@ -8257,8 +8791,6 @@ export type CteSimpSefazCIBSSimp = {
   vIBS: number;
   gCBS: CteSimpSefazGCBSSimp;
   gTribRegular?: CteSimpSefazTribRegularSimp;
-  gIBSCredPres?: CteSimpSefazCredPresSimp;
-  gCBSCredPres?: CteSimpSefazCredPresSimp;
   gTribCompraGov?: CteSimpSefazTribCompraGovSimp;
 };
 /** @description Grupo de informações do IBS na UF. */
@@ -8280,6 +8812,8 @@ export type CteSimpSefazDifSimp = {
 };
 /** @description Grupo de Informações da devolução de tributos. */
 export type CteSimpSefazDevTribSimp = {
+  /** @description Percentual de devolução do tributo, conforme LC 214/25 art. 118. */
+  pDevTrib?: number;
   /**
    * @description Valor do tributo devolvido. No fornecimento de energia elétrica, água, esgoto e
    * gás natural e em outras hipóteses definidas no regulamento.
@@ -8310,8 +8844,25 @@ export type CteSimpSefazGCBSSimp = {
   gDif?: CteSimpSefazDifSimp;
   gDevTrib?: CteSimpSefazDevTribSimp;
   gRed?: CteSimpSefazRedSimp;
+  gALCZFMCBS?: CteSimpSefazALCZFMCBSSimp;
   /** @description Valor da CBS. */
   vCBS: number;
+};
+/**
+ * @description Grupo de operações em áreas incentivadas (ALC/ZFM) - CBS (alíquota zero).
+ * Grupo de informações para identificação de operações em áreas incentivadas (ALC/ZFM) com alíquota zero da CBS, conforme arts. 451 e 466 da LC 214/2025, quando fornecedor e destinatário estiverem nessas áreas, distinguindo a existência de processo aprovado na Suframa.
+ */
+export type CteSimpSefazALCZFMCBSSimp = {
+  /**
+   * @description Percentual efetivo sem a redução.
+   * Alíquota efetiva de referência da CBS aplicável à operação fora de áreas ou regimes incentivados.
+   */
+  pAliqEfetRegCBS: number;
+  /**
+   * @description Valor efetivo sem a redução.
+   * Valor da CBS calculado para a operação fora de áreas ou regimes incentivado.
+   */
+  vTribRegCBS: number;
 };
 /** @description Grupo de informações da Tributação Regular. Informar como seria a tributação caso não cumprida a condição resolutória/suspensiva. Exemplo 1: Art. 442, §4. Operações com ZFM e ALC. Exemplo 2: Operações com suspensão do tributo. */
 export type CteSimpSefazTribRegularSimp = {
@@ -8353,17 +8904,6 @@ export type CteSimpSefazTribRegularSimp = {
    */
   vTribRegCBS: number;
 };
-/** @description Grupo de Informações do Crédito Presumido referente ao IBS, quando aproveitado pelo emitente do documento. */
-export type CteSimpSefazCredPresSimp = {
-  /** @description Usar tabela Cred Presumido, para o emitente da nota. */
-  cCredPres: string;
-  /** @description Percentual do Crédito Presumido. */
-  pCredPres: number;
-  /** @description Valor do Crédito Presumido. */
-  vCredPres?: number;
-  /** @description Valor do Crédito Presumido Condição Suspensiva, preencher apenas para cCredPres que possui indicação de Condição Suspensiva. */
-  vCredPresCondSus?: number;
-};
 /** @description Grupo de informações da composição do valor do IBS e da CBS em compras governamental. */
 export type CteSimpSefazTribCompraGovSimp = {
   pAliqIBSUF?: number;
@@ -8375,6 +8915,36 @@ export type CteSimpSefazTribCompraGovSimp = {
   pAliqCBS?: number;
   /** @description Valor que seria devido a CBS, sem aplicação do Art. 473. da LC 214/2025. */
   vTribCBS: number;
+};
+/** @description Informado conforme indicador no cClassTrib. */
+export type CteSimpSefazEstornoCredSimp = {
+  /** @description Valor do IBS a ser estornado. */
+  vIBSEstCred: number;
+  /** @description Valor da CBS a ser estornada. */
+  vCBSEstCred: number;
+};
+/** @description Grupo de informações da vínculação com a transação de pagamento. */
+export type CteSimpSefazPgtoVincSimp = {
+  pgto: CteSimpSefazPagamentoRTCSimp[];
+};
+/** @description Dados de cada pagamento previsto. */
+export type CteSimpSefazPagamentoRTCSimp = {
+  /** @description Número sequencial do pagamento. */
+  nPag: string;
+  /** @description ID específico da transação financeira conforme o meio de pagamento. */
+  idTransacao: string;
+  /** @description (Meio de pagamento utilizado (ver IT DFe 2026.001). */
+  tpMeioPgto: string;
+  /**
+   * @description CNPJ do recebedor do pagamento.
+   * Informar zeros não significativos.
+   */
+  CNPJReceb: string;
+  /**
+   * @description CNPJ base da instituição financeira.
+   * Informar zeros não significativos.
+   */
+  CNPJBasePSP: string;
 };
 /** @description Valores Totais do CTe. */
 export type CteSimpSefazTotalSimp = {
@@ -10199,6 +10769,7 @@ export type NfeSefazInfNFe = {
   infRespTec?: NfeSefazInfRespTec;
   infSolicNFF?: NfeSefazInfSolicNFF;
   agropecuario?: NfeSefazAgropecuario;
+  infPAA?: NfeSefazInfPAA;
 };
 /** @description identificação da NF-e. */
 export type NfeSefazIde = {
@@ -10237,6 +10808,11 @@ export type NfeSefazIde = {
    * @description Data e Hora da saída ou de entrada da mercadoria / produto (AAAA-MM-DDTHH:mm:ssTZD).
    */
   dhSaiEnt?: string;
+  /**
+   * Format: date
+   * @description Data da previsão de entrega ou disponibilização do bem (AAAA-MM-DD).
+   */
+  dPrevEntrega?: string;
   /**
    * @description Tipo do Documento Fiscal:
    * 0 - Entrada
@@ -10744,6 +11320,8 @@ export type NfeSefazProd = {
   CNPJFab?: string;
   cBenef?: string;
   gCred?: NfeSefazGCred[];
+  /** @description Classificação para subapuração do IBS na ZFM. */
+  tpCredPresIBSZFM?: number;
   /** @description Código EX TIPI (3 posições). */
   EXTIPI?: string;
   /** @description Cfop. */
@@ -11804,16 +12382,30 @@ export type NfeSefazICMS90 = {
   vBC?: number;
   /** @description Percentual de redução da BC. */
   pRedBC?: number;
+  /** @description Código de Benefício Fiscal na UF aplicado ao item quando houver RBC. */
+  cBenefRBC?: string;
   /** @description Alíquota do ICMS. */
   pICMS?: number;
   /** @description Valor do ICMS. */
   vICMS?: number;
+  /** @description Valor do ICMS da Operação. */
+  vICMSOp?: number;
+  /** @description Percentual do diferemento. */
+  pDif?: number;
+  /** @description Valor do ICMS da diferido. */
+  vICMSDif?: number;
   /** @description Valor da Base de cálculo do FCP. */
   vBCFCP?: number;
   /** @description Percentual de ICMS relativo ao Fundo de Combate à Pobreza (FCP). */
   pFCP?: number;
   /** @description Valor do ICMS relativo ao Fundo de Combate à Pobreza (FCP). */
   vFCP?: number;
+  /** @description Percentual do diferimento do ICMS relativo ao Fundo de Combate à Pobreza (FCP). */
+  pFCPDif?: number;
+  /** @description Valor do ICMS relativo ao Fundo de Combate à Pobreza (FCP) diferido. */
+  vFCPDif?: number;
+  /** @description Valor efetivo do ICMS relativo ao Fundo de Combate à Pobreza (FCP). */
+  vFCPEfet?: number;
   /**
    * @description Modalidade de determinação da BC do ICMS ST:
    * 0 - Preço tabelado ou máximo  sugerido
@@ -11866,7 +12458,7 @@ export type NfeSefazICMS90 = {
 };
 /**
  * @description Partilha do ICMS entre a UF de origem e UF de destino ou a UF definida na legislação
- * Operação interestadual para consumidor final com partilha do ICMS  devido na operação entre a UF de origem e a UF do destinatário ou ou a UF definida na legislação. (Ex. UF da concessionária de entrega do  veículos).
+ * Operação interestadual para consumidor final com partilha do ICMS devido na operação entre a UF de origem e a UF do destinatário ou ou a UF definida na legislação. (Ex. UF da concessionária de entrega do veículos).
  */
 export type NfeSefazICMSPart = {
   /**
@@ -11885,6 +12477,7 @@ export type NfeSefazICMSPart = {
   /**
    * @description Tributação pelo ICMS
    * 10 - Tributada e com cobrança do ICMS por substituição tributária
+   * 20 - Redução de base de cálculo
    * 90 - Outros
    */
   CST: string;
@@ -11931,6 +12524,16 @@ export type NfeSefazICMSPart = {
   pFCPST?: number;
   /** @description Valor do FCP retido por substituição tributária. */
   vFCPST?: number;
+  /** @description Valor do ICMS de desoneração. */
+  vICMSDeson?: number;
+  /** @description Motivo da desoneração do ICMS:9-Outros;10=Deficiente Condutor (Convênio ICMS 38/12) 11=Deficiente Não Condutor (Convênio ICMS 38/12). */
+  motDesICMS?: number;
+  /**
+   * @description Indica se o valor do ICMS desonerado (vICMSDeson) deduz do valor do item (vProd):
+   * 0 - Valor do ICMS desonerado (vICMSDeson) não deduz do valor do item (vProd) / total da NF-e
+   * 1 - Valor do ICMS desonerado (vICMSDeson) deduz do valor do item (vProd) / total da NF-e
+   */
+  indDeduzDeson?: number;
   /** @description Percentual para determinação do valor  da Base de Cálculo da operação própria. */
   pBCOp: number;
   /** @description Sigla da UF para qual é devido o ICMS ST da operação. */
@@ -12644,9 +13247,14 @@ export type NfeSefazTribNFe = {
   /** @description Código Situação Tributária do IBS/CBS. */
   CST: string;
   cClassTrib?: string;
+  /** @description Indica se a operação é de doação. */
+  indDoacao?: number;
   gIBSCBS?: NfeSefazCIBS;
   gIBSCBSMono?: NfeSefazMonofasia;
   gTransfCred?: NfeSefazTransfCred;
+  gAjusteCompet?: NfeSefazAjusteCompet;
+  gEstornoCred?: NfeSefazEstornoCred;
+  gCredPresOper?: NfeSefazCredPresOper;
   gCredPresIBSZFM?: NfeSefazCredPresIBSZFM;
 };
 export type NfeSefazCIBS = {
@@ -12658,8 +13266,6 @@ export type NfeSefazCIBS = {
   vIBS: number;
   gCBS: NfeSefazGCBS;
   gTribRegular?: NfeSefazTribRegular;
-  gIBSCredPres?: NfeSefazCredPres;
-  gCBSCredPres?: NfeSefazCredPres;
   gTribCompraGov?: NfeSefazTribCompraGov;
 };
 /** @description Grupo de informações do IBS na UF. */
@@ -12756,8 +13362,6 @@ export type NfeSefazTribRegular = {
 };
 /** @description Grupo de Informações do Crédito Presumido referente ao IBS, quando aproveitado pelo emitente do documento. */
 export type NfeSefazCredPres = {
-  /** @description Código de Classificação do Crédito Presumido do IBS e da CBS. */
-  cCredPres: string;
   /** @description Percentual do Crédito Presumido. */
   pCredPres: number;
   /** @description Valor do Crédito Presumido. */
@@ -12845,8 +13449,35 @@ export type NfeSefazTransfCred = {
   /** @description Valor da CBS a ser transferida. */
   vCBS: number;
 };
+/** @description Informar essa opção da Choice para o CST 811. */
+export type NfeSefazAjusteCompet = {
+  /** @description Ano e mês referência do período de apuração (AAAA-MM). */
+  competApur: string;
+  /** @description Valor do IBS. */
+  vIBS: number;
+  /** @description Valor da CBS. */
+  vCBS: number;
+};
+/** @description Informado conforme indicador no cClassTrib. */
+export type NfeSefazEstornoCred = {
+  /** @description Valor do IBS a ser estornado. */
+  vIBSEstCred: number;
+  /** @description Valor da CBS a ser estornada. */
+  vCBSEstCred: number;
+};
+/** @description Crédito Presumido da Operação. Informado conforme indicador no cClassTrib. */
+export type NfeSefazCredPresOper = {
+  /** @description Valor da Base de Cálculo do Crédito Presumido da Operação. */
+  vBCCredPres: number;
+  /** @description Código de Classificação do Crédito Presumido do IBS e da CBS. */
+  cCredPres: string;
+  gIBSCredPres?: NfeSefazCredPres;
+  gCBSCredPres?: NfeSefazCredPres;
+};
 /** @description Classificação de acordo com o art. 450, § 1º, da LC 214/25 para o cálculo do crédito presumido na ZFM. */
 export type NfeSefazCredPresIBSZFM = {
+  /** @description Ano e mês referência do período de apuração (AAAA-MM). */
+  competApur: string;
   /**
    * @description Classificação de acordo com o art. 450, § 1º, da LC 214/25 para o cálculo do crédito presumido na ZFM.
    * 0 - Sem crédito presumido
@@ -12858,7 +13489,7 @@ export type NfeSefazCredPresIBSZFM = {
    */
   tpCredPresIBSZFM: number;
   /** @description Valor do crédito presumido calculado sobre o saldo devedor apurado. */
-  vCredPresIBSZFM?: number;
+  vCredPresIBSZFM: number;
 };
 export type NfeSefazImpostoDevol = {
   /** @description Percentual de mercadoria devolvida. */
@@ -13022,6 +13653,7 @@ export type NfeSefazIBSCBSMonoTot = {
   gIBS?: NfeSefazGIBS;
   gCBS?: NfeSefazIBSCBSMonoTot_GCBS;
   gMono?: NfeSefazGMono;
+  gEstornoCred?: NfeSefazGEstornoCred;
 };
 /** @description Totalização do IBS. */
 export type NfeSefazGIBS = {
@@ -13082,6 +13714,13 @@ export type NfeSefazGMono = {
   vIBSMonoRet: number;
   /** @description Valor da CBS monofásica retida anteriormente. */
   vCBSMonoRet: number;
+};
+/** @description Totalização do estorno de crédito. */
+export type NfeSefazGEstornoCred = {
+  /** @description Valor total do IBS estornado. */
+  vIBSEstCred: number;
+  /** @description Valor total da CBS estornada. */
+  vCBSEstCred: number;
 };
 /** @description Dados dos transportes da NF-e. */
 export type NfeSefazTransp = {
@@ -13410,6 +14049,29 @@ export type NfeSefazGuiaTransito = {
   serieGuia?: string;
   /** @description Número da Guia. */
   nGuia: string;
+};
+/** @description Grupo de Informação do Provedor de Assinatura e Autorização. */
+export type NfeSefazInfPAA = {
+  /** @description CNPJ do Provedor de Assinatura e Autorização. */
+  CNPJPAA: string;
+  PAASignature: NfeSefazPAASignature;
+};
+/** @description Assinatura RSA do Emitente para DFe gerados por PAA. */
+export type NfeSefazPAASignature = {
+  /**
+   * Format: byte
+   * @description Assinatura digital padrão RSA.
+   * Converter o atributo Id do DFe para array de bytes e assinar com a chave privada do RSA com algoritmo SHA1 gerando um valor no formato base64.
+   */
+  SignatureValue: string;
+  RSAKeyValue: NfeSefazRSAKeyValueType;
+};
+/** @description Chave Publica no padrão XML RSA Key. */
+export type NfeSefazRSAKeyValueType = {
+  /** Format: byte */
+  Modulus?: string;
+  /** Format: byte */
+  Exponent?: string;
 };
 /** @description Informações suplementares Nota Fiscal. */
 export type NfeSefazInfNFeSupl = {
